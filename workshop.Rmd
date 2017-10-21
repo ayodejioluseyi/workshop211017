@@ -1,0 +1,651 @@
+---
+title: "data exploration"
+author: "Ayodeji"
+date: "19 October 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Machine Learning in R
+
+Machine learning is a branch in computer science that studies the design of algorithms that can learn.
+As a Data Scientist working for an organization, applying Machine Learning algorithms will form an essential part of most of your projects. Your clients want to know how to maximise profit and reduce losses. A client may want to know if a client will default on a loan and another cliet may want to know how the weather affect his sales and hence forecast how much he will make at a certain time in future. Some specific applications include:
+
+1. Customer account cancellation early prediction model.
+2. Demand forecasting and price determination for hotel inventory.
+3. Development of stock trading and portfolio management strategies banks.
+4. Predicting customer churning
+
+
+These and many more are ways that machine learning can help a business/government. As a result, the role of a Data Scientist in today's (and future) world, cannot be overemphasised.
+
+
+The image below is a typical Data science lifecycle. Not that though it doesn't show in the diagram, the lifecycle is an iterative process.
+
+![optional caption text](images/dslifecycle.png)
+In our workshop today, we will focus a little bit on how to manage data, and majorly on applying ML to various problems.
+
+# Reading Data into R
+Data can be saved in a file on your machine in an Excel, SPSS, or some other type of file, or can be sourced from the Internet or other sources.
+
+If you have a .txt or a tab-delimited text file, you can easily import it with the basic R function read.table().
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(yhat)
+library(leaflet)
+library(highcharter)
+library(XML)
+library(RCurl)
+library(hexbin)
+library(rpart)
+library(scales)
+library(ROCR)
+library(grid)
+```
+
+```{r}
+df <- read.table("data/test.txt", 
+                 header = FALSE)
+```
+R stores your data in what is called a **dataframe** object. This is basically a table like format with each row representing an observation and each column representing a variable/feature. More of this later.
+In many cases, your data will not be delimited by tabs (.tsv) but instead by commas (.csv). In this case, we can use the *read.csv* or *read.csv2()* functions. The former function is used if the separator is a ,, the latter if ; is used to separate the values in your data file. The difference between these twin functions and the *read.table()* function is that they have the header and fill arguments set as TRUE by default.
+
+**Activity** Play around with the read.csv(), read.csv2() and read.table() functions.
+
+There are many other functions for reading data into R depending on the format of your data. Some include read_csv(), fromJSON() for reading csv files and the latter for reading in JSON file. Note that you will need to load the rjson package to use the from JSON() function.
+
+### Importing HTML tables
+We use the readHTML() to read HTML tables from websites. For example, say we read a table from the BBC website, the following should suffice
+
+```{r}
+url <- "http://www.bbc.co.uk/sport/football/tables"
+urldata <- getURL(url)
+
+data_df <- readHTMLTable(urldata, stringsAsFactors = FALSE)
+data_df
+```
+
+
+That's it for readig in Data into R! Most of the data we will work with today will be .csv files. You will find them in the data folder.
+
+# Investigating your dataset
+The first thing you want to do as a Data Scientist is to investigate your dataset. Investigating mainly means understading the contents of your dataset. R has a few functions for investigating datasets. The *str()* function shows us the structure of the dataset whilst the *summary()* function gives us the summary statistics of the dataset. *head()* and *tail()* outputs the first 6 and last 6 observations of the dataset.
+
+```{r}
+uciCar <- read.table('http://www.win-vector.com/dfiles/car.data.csv',
+                     header=TRUE, sep=',')
+str(uciCar)
+summary(uciCar)
+head(uciCar)
+tail(uciCar, 7)
+```
+
+# Data Exploration
+In this section, we will explore the dataset. We have already done a bit of it by looking at the structure, summary statistics, etc in the previous section. However, data exploration is not complete without some plots!
+
+The dataset used for this section contains individual details of customers of an Insurance firm. We want to predict the probability of health insurance coverage.
+
+First we read in the data
+```{r}
+custdata <- read.table('data/custdata.tsv', header = T, sep = '\t')
+```
+
+Use the str() and summary() to investigate the dataset
+
+```{r}
+str(custdata)
+
+```
+```{r}
+summary(custdata)
+```
+
+What can you say about this dataset?
+
+Take a look at the summary statistics column by column. 
+
+..* The variable is.employed is missing for about a third of the data.
+
+..* The variable income has negative values. What does this mean?
+
+..* The average value of the variable age seems plausible but te minimum and maximum values seem unlikely
+
+..* The variable state.of.res is a categorical variable and we can see the number of customers in each state for the first few states.
+
+You can also use specific commands like mean(), median(), variance, quantile and so on to find the mean, median, variance, quantile, respectively.
+
+```{r}
+mean(custdata$age, na.rm = TRUE)
+```
+
+NAs for is.employed variable could mean a number of things. It could mean that the values were not collected or could also mean ' not in active work'. It is important as a data scientist, to find out what it means before deciding what to do with this variable.
+
+In the age variable, we ecounter unusually high age value. This is possibly an outlier. Outliers have a way of skewing out data.
+
+```{r}
+sum(custdata$age, na.rm = TRUE)
+sum(subset(custdata, age <= 100)$age, na.rm = TRUE)
+```
+
+## Plots
+Let's do a density plot for the age variable
+
+```{r}
+ggplot(custdata, aes(age)) + geom_density()
+```
+
+We can also plot a histogram for the same variable
+
+```{r}
+ggplot(custdata) + geom_histogram(aes(x = age), binwidth = 5, fill = "gray")
+```
+
+What can you say about the income from the density plot of the income variable below?
+
+```{r}
+ggplot(custdata) + geom_density(aes(x = income)) + scale_x_continuous(labels=dollar)
+```
+
+We can plot in log form
+
+```{r}
+ggplot(custdata) + geom_density(aes(x = income)) + scale_x_log10(breaks = c(100,1000,
+                                                                             10000,
+                                                                             100000),
+                                                                 labels = dollar_format(suffix = "", prefix = "$")) + annotation_logticks(sides = 'bt')
+```
+
+* Customers with income over $200,000 are rare
+
+* Most customers have income in the $20,000 to $100,000 range
+
+* The warnings indicate that ggplot2 ignored the zero- and negative-valued rows (since log(0) = Infinity).
+
+When your data is heavily skewed, use log scales.
+
+## BAr Charts
+You can also use bar charts to visualise part of the data. For example, we can visualise the marital status variable in our data
+
+```{r}
+ggplot(custdata) + geom_bar(aes(x = marital.stat), fill = "gray")
+```
+What are your observations from he plot above?
+
+Let us look at the number of customers per state
+
+```{r}
+ggplot(custdata) + geom_bar(aes(x = state.of.res), fill = "gray") + coord_flip() +
+  theme(axis.text.y=element_text(size = rel(0.8)))
+```
+
+### Comparing two variables
+Many times, we want to see how two features compare. How does one feature affect the other. We call this, correlation. If correlation is positive between wo variables, it infers that as the value of one variable increases, the other also increases. If negative, it infers that as the value of one variable increases, the other decreases and if the correlation is zero, then they have no effect on each other.
+
+To view the correlations, we use a scatter plot.
+
+```{r}
+ggplot(subset(custdata,(custdata$age > 0 & custdata$age < 100 & custdata$income > 0)), aes(x = age, y = income)) + geom_point() + ylim(0, 200000)
+```
+
+We can now include a smoothing curve into our model to give a better inderstanding of what's happening
+
+```{r}
+ggplot(subset(custdata,(custdata$age > 0 & custdata$age < 100 & custdata$income > 0)), aes(x = age, y = income)) + geom_point() + geom_smooth() + ylim(0, 200000)
+```
+
+More visually appealing and representative is the Hexbin curve
+
+```{r}
+ggplot(subset(custdata,(custdata$age > 0 & custdata$age < 100 & custdata$income > 0)), aes(x = age, y = income)) + geom_hex(binwidth = c(5, 10000)) + 
+  geom_smooth(color = "white") + ylim(0, 200000)
+```
+Hexbin plots are good when you have high volume data
+
+We can also take a look at how age affects the probability of one getting health insurance.
+
+```{r}
+ggplot(subset(custdata,(custdata$age > 0 & custdata$age < 100 & custdata$income > 0)), aes(x = age, y = as.numeric(health.ins))) + 
+  geom_point(position = position_jitter(w = 0.05, h = 0.05)) + 
+  geom_smooth(color = "blue")
+```
+
+This shows that the probability of getting health insurance increases as age increases.
+
+Going forward, it may also be important to view some of the variables side by side.There are several ways of doing this. Below, I will show a few plots and give us time to discuss them.
+
+```{r}
+ggplot(custdata) + geom_bar(aes(x = marital.stat, fill = health.ins), 
+                            position = "dodge")
+```
+
+```{r}
+ggplot(subset(custdata,(custdata$age > 0 & custdata$age < 100 & custdata$income > 0))) + geom_bar(aes(x = housing.type, fill = marital.stat), position = "dodge") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+ggplot(subset(custdata,(custdata$age > 0 & custdata$age < 100 & custdata$income > 0))) + geom_bar(aes(x = marital.stat), position = "dodge", fill = "blue") + 
+  facet_wrap(~housing.type, scales = "free_y") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+That's it! There are so many ways of visualizing and exploring our data. Some have been shown above. Feel free to read books, study tutorials and investigate more ways. 
+In the next session, we'll take a quick look at Hardley Wickham's dplyr before we start building our ML models!
+
+# Quick introduction to DPLYR
+The dplyr package is one of the most powerful packages in R and was written by R programmer, Hadley Wickham. It makes it easy to manipulate, clean, summarize and visualize unstructured data. In combination with the *magrittr* package, dplyr makes the data scientist's job simpler. 
+
+**Dplyr functions:**
+
+* *select()*	select columns
+
+* *filter()*	filter rows
+
+* *arrange()*	re-order or arrange rows
+
+* *mutate()*	create new columns
+
+* *summarise()*	summarise values
+
+* *group_by()*	allows for group operations in the “split-apply-combine” concept
+
+In addition, we have the pipe operator from magrittr package "%>%"
+
+
+We will use another dataset - the msleep data inthis section.
+
+```{r}
+msleep <- read.csv("data//msleep.csv")
+```
+
+Examples are best to show how dplyr verbs work.
+
+```{r}
+head(select(msleep, name, sleep_total))
+```
+
+Can you explain what the code means?
+
+We can do same with the code below:
+
+```{r}
+msleep %>% 
+    select(name, sleep_total) %>% 
+    head
+```
+
+Another example:
+
+```{r}
+msleep %>% arrange(order) %>% head
+```
+
+Now, we will select three columns from msleep, arrange the rows by the taxonomic order and then arrange the rows by sleep_total. Finally show the head of the final data frame
+
+```{r}
+msleep %>% 
+    select(name, order, sleep_total) %>%
+    arrange(order, sleep_total) %>% 
+    head
+```
+
+Let's filter the rows for mammals that sleep for 16 or more hours instead of showing the head of the final data frame
+
+```{r}
+msleep %>% 
+    select(name, order, sleep_total) %>%
+    arrange(order, sleep_total) %>% 
+    filter(sleep_total >= 16)
+```
+
+Now, let's arrange the rows in the sleep_total column in a descending order. For this, use the function desc()
+
+```{r}
+msleep %>% 
+    select(name, order, sleep_total) %>%
+    arrange(order, desc(sleep_total)) %>% 
+    filter(sleep_total >= 16)
+```
+
+The **mutate()** function will add new columns to the data frame. Create a new column called rem_proportion which is the ratio of rem sleep to total amount of sleep.
+
+```{r}
+msleep %>% 
+    mutate(rem_proportion = sleep_rem / sleep_total) %>%
+    head
+```
+
+You can create many new columns using mutate (separated by commas). Here we add a second column called bodywt_grams which is the bodywt column in grams.
+
+```{r}
+msleep %>% 
+    mutate(rem_proportion = sleep_rem / sleep_total, 
+           bodywt_grams = bodywt * 1000) %>%
+    head
+```
+
+The summarise() function will create summary statistics for a given column in the data frame such as finding the mean. For example, to compute the average number of hours of sleep, apply the mean() function to the column sleep_total and call the summary value avg_sleep.
+
+```{r}
+msleep %>% 
+    summarise(avg_sleep = mean(sleep_total))
+```
+
+Other summary statistics include:  sd(), min(), max(), median(), sum(), n() (returns the length of vector), first() (returns first value in vector), last() (returns last value in vector) and n_distinct() (number of distinct values in vector).
+
+```{r}
+msleep %>% 
+    summarise(avg_sleep = mean(sleep_total), 
+              min_sleep = min(sleep_total),
+              max_sleep = max(sleep_total),
+              total = n())
+```
+
+Finally, the *group_by()* verb is an important function in dplyr. It is related to concept of “split-apply-combine”. We literally want to split the data frame by some variable (e.g. taxonomic order), apply a function to the individual data frames and then combine the output.
+
+Let’s do that: split the msleep data frame by the taxonomic order, then ask for the same summary statistics as above. We expect a set of summary statistics for each taxonomic order.
+
+```{r}
+msleep %>% 
+    group_by(order) %>%
+    summarise(avg_sleep = mean(sleep_total), 
+              min_sleep = min(sleep_total), 
+              max_sleep = max(sleep_total),
+              total = n())
+```
+
+# Machine Learning
+### Linear Regression
+Linear regression models the expected value of a numeric variable in terms of numeric and categorical variables. For example, we may want to predict how much sales a store will make based on factors like weather, income of visitors, time of the year and other conditions. 
+
+In our example task, we will try to predict personal income from other demographic details such as age, education using the 2011 US Census PUMS data. We also want to see the effect of a Bachelor's degree on income relative to having no degree at all.
+
+**Notes**
+
+* The data is restricted to full time employees between 20 and 50 years of age with an income between $1,000 and $250,000.
+
+*Load the data*
+
+```{r}
+load("data/psub.RData")
+
+```
+
+Divide the data into training and test data
+
+```{r}
+dtrain <- subset(psub, ORIGRANDGROUP >= 500)
+dtest <- subset(psub, ORIGRANDGROUP < 500)
+
+```
+
+Creating a linear regression model is simple
+
+```{r}
+model <- lm(log(PINCP, base = 10) ~ AGEP + SEX + COW + SCHL, data = dtrain)
+```
+* AGEP: Age
+
+* SEX: sex
+
+* COW: class of worker
+
+* SCHL: level of education
+
+* PINCP: personal income
+
+Predict the income using the test data
+
+```{r}
+dtest$predLogPINCP <- predict(model, newdata = dtest)
+```
+Do same for training data
+
+```{r}
+dtrain$predLogPINCP <- predict(model, newdata = dtrain)
+```
+That's it! We have now produced and applied a *lm* model. All we need to do is to evaluate our model
+
+**Evaluation**
+First we mat want to see how our predicted values in predLogPINCP compares with the actual values in PINCP. 
+
+**Activity:** What do you expect to see if the predictions are good?
+
+```{r}
+ggplot(data = dtest, aes(x = predLogPINCP, y = log(PINCP, base = 10))) + 
+  geom_point(alpha = 0.2, color = "black") + 
+  geom_smooth(aes(x = predLogPINCP, y = log(PINCP, base = 10)), color = "black") +
+  geom_line(aes(x = log(PINCP, base = 10), y = log(PINCP, base = 10)), color = "blue",
+            linetype = 2) + scale_x_continuous(limits = c(4,5)) +
+  scale_y_continuous(limits = c(3.5,5.5))
+
+```
+The thick black line is the average relation between the two variables whilst the short dashed blue line is ideal relation between them. As you can see, we don't seem to have done too badly with our predictions although it seems our input variables don't explain the output too closely as noted by the wide cloud of points.
+
+One other way to view the performance of our model is to look at the residuals. Residuals are basically the prediction errors, in this case: predLogPINCP - log(PINCP, base = 10). 
+
+**Activity:** When we plot residuals, what should we expect to see?
+
+
+
+If we plot these two relations, we have
+
+```{r}
+ggplot(data = dtest, aes(x = predLogPINCP, y = predLogPINCP - log(PINCP, base = 10))) + 
+  geom_point(alpha = 0.2, color = "black") + geom_smooth(aes(x = predLogPINCP,
+                                                             y = predLogPINCP - log(PINCP, base = 10)), color = "black")
+```
+
+As you can see, the residual values are close to 0 though we again have a wide cloud of points. 
+
+Another good way of measuring accuracy is to use the R-squared value. We can look at this as the fraction of the y variation that is explained by the model. We want this value to be as close to 1 as possible for both training and test data. If the R-squared value for the training data is good but poor for the test data, we say our model is overfitting. 
+
+To evaluate the R-squared for our model
+
+```{r}
+rsq <- function(y,f) {1 - sum((y-f) ^ 2)/sum((y-mean(y))^2)}
+rsq(log(dtrain$PINCP, base = 10), predict(model, newdata = dtrain))
+rsq(log(dtest$PINCP, base = 10), predict(model, newdata = dtest))
+```
+
+The values for our R-squared is too low. So we classify our model as of low quality.
+
+**Activity:** Can you suggest ways by which we can improve our model performance?
+
+Our goal in this section is to find the value of having a Bachelor's degree. We can use our linear model to evaluate this value.
+
+```{r}
+coefficients(model)
+```
+
+We can explain these coefficients in this way. Take for example, the SCHLBachelor's degree. The value here is about 0.39 which is explained as the income ratio between someone with a bachelor's degree and the equivalent person (same sex, age and class of work) without a high school dgree is about 10 ^ 0.39 or 2.45 times higher. The no high school diploma is a *reference* level.
+
+Same thing under the SCHLRegular high school diploma we have 0.10 which we can read as "The model believes that having a bachelor's degree tends to add 0.39 - 0.10 units to the predicted log income(relative to high school degree)". The modelled relation between the bachelor's degree holder's expected income and the high school graduate's (all other variables being equal) is 10 ^ (0.39 - 0.10), or about 1.8 times greater!
+
+**Activity:** Can you explain the SEX and COW variables in the same way?
+
+For AGEP which is a continuous variable, the coefficient is 0.0117 which can be explained as "a one year increase in age will add a 0.0117 bonus to log income" or an increase in age of one year corresponds to an increase in income of 10 ^ 0.0117 or 1.027 or 2.7% increase in income (all other variables being equal).
+
+```{r}
+summary(model)
+```
+
+In the summary function, we are presented with the model equation, the r-quantiles of the residuals, the coefficients and the model quality summary. We expect the median of the residuals to be close to zero and the 1st and 3rd quantiles to be symetrical and not too large.
+
+for the coefficients, a -0.093 estimate for SEXF for example implies that te model earned a penalty f -0.093 to log(PINCP, base = 10) for being female. Alternatively, this means that females are modelled to as earning 1 - 10 ^ -0.093 relative to males or 19% less, all other model parameters being equal.
+
+The *p-value* is also given as part of the coeffients. Generally, we say that when p >= 0.05, we should not trust this variable. Note however that once the values are good enough, the quantity of the p-value does not matter.
+
+For the model quality summary,
+
+* You want to have a large value for your DOF to prevent overfitting. The DOF is the number of data rows minus the number of coefficients.
+
+
+
+### Logistic Regression
+
+Logistic regression models can directly predict values restricted to the (0,1) interval. It predicts the probability y that an instance belongs to a specific category. In this section, we will use logistic regression to predict if a new born baby will require extra medical attention.
+
+First as always, we load the data
+
+```{r}
+load("data/NatalRiskData.rData")
+```
+
+
+Then we divide into training and test data
+
+```{r}
+train <- sdata[sdata$ORIGRANDGROUP <= 5, ]
+test <- sdata[sdata$ORIGRANDGROUP > 5, ]
+```
+
+We will restrict the input variables only to those that can be known before delivery or during labour for example mother's weight, health history and so on.
+
+The variable we want to predict is atRisk. The input variables we will use are:
+
+1. PWGT: Mother's pregnancy weight
+
+2. UPREVIS: Number of prenatal medical visits
+
+3. CIG_REC: True if smoker and False otherwise
+
+4. GESTREC3: < 37 weeks (premature) and >= 37 weeks
+
+5. DPLURAL: Birth plurality - single/twin/triplet+
+
+6. ULD_MECO: TRUE if moderate/heavy faecal staining of amniotic fluid
+
+7. ULD_PRECIP: TRUE for unusually short labour
+
+8. ULD_BREECH: TRUE for pelvis first birth position
+
+9. URF_DIAB: TRUE if mother is diabetic
+
+10. URF_CHYPER: TRUE if mother has chronic hypertension
+
+11. URF_PHYPER: TRUE if mother has pregnancy related hypertention
+
+12. URF_ECLAM: TRUE if mother experienced eclampsia: pregnancy-related seizures
+
+Combine variables
+
+```{r}
+complications <- c("ULD_MECO", "ULD_PRECIP", "ULD_BREECH")
+riskfactors <- c("URF_DIAB", "URF_CHYPER", "URF_PHYPER", "URF_ECLAM")
+
+y <- "atRisk"
+x <- c("PWGT", "UPREVIS", "CIG_REC", "GESTREC3", "DPLURAL", complications, riskfactors)
+fmla <- paste(y, paste(x, collapse = "+"), sep = "~")
+```
+
+Build the Regression model
+
+```{r}
+print(fmla)
+model <- glm(fmla, data = train, family = binomial(link = "logit"))
+```
+
+Again, very easy to implement. Let's make some predictions and compare.
+
+```{r}
+train$pred <- predict(model, newdata = train, type = "response")
+test$pred <- predict(model, newdata = test, type = "response")
+```
+
+type(response) tells the predict() function to return the predicted probabilities y.
+
+Remember we are classifying new instances into at-Risk and not-at-Risk. We can check this by plotting the distribution of scores for both the positive and negative instances. We want high scores for positive and low scores for negative instances.
+
+```{r}
+ggplot(train, aes(x = pred, color = atRisk, linetype = atRisk)) + geom_density()
+#ggplot(test, aes(x = pred, color = atRisk, linetype = atRisk)) + geom_density()
+```
+
+Sadly our atRisk predictions both have low scores which isn't surprising since the positive instances are rare (about 1.8% of the all births in the dataset).
+
+To use the model as a classifier, we select a threshold. This is typically selected as value in between the two plots above. As our distributions are not well separated, we'll use the precision and recall plots to select a threshold. The higher we set the threshold, the more precise the classifier will be which means that we will identify a set of situations with a much higher than average rate of at-risk births but will miss a higher percentage of at-risk situations. 
+
+```{r}
+predObj <- prediction(train$pred, train$atRisk)
+precObj <- performance(predObj, measure = "prec")
+recObj <- performance(predObj, measure = "rec")
+
+precision <- (precObj@y.values)[[1]]
+prec.x <- (precObj@x.values)[[1]]
+recall <- (recObj@y.values)[[1]]
+
+rocFrame <- data.frame(threshold = prec.x, precision = precision, recall = recall)
+
+nplot <- function(plist) {
+  n <- length(plist)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(n,1)))
+  vplayout = function(x,y) {viewport(layout.pos.row = x, layout.pos.col = y)}
+  for(i in 1:n) {
+    print(plist[[i]], vp = vplayout(i,1))
+    
+  }
+}
+
+pnull <- mean(as.numeric(train$atRisk))
+p1 <- ggplot(rocFrame, aes(x = threshold)) + geom_line(aes(y=precision/pnull)) +
+  coord_cartesian(xlim = c(0, 0.05), ylim = c(0,10))
+p2 <- ggplot(rocFrame, aes(x = threshold)) + geom_line(aes(y = recall)) + 
+  coord_cartesian(xlim = c(0,0.05))
+
+nplot(list(p1,p2))
+
+```
+
+What can you infer from the plots in terms of the threshold values?
+
+The best trade-off between precision and recall is a function of how many resources the hospital has available to allocate and how many they can keep in reserve for the situations that the classifier missed.
+
+**Activity:** What is your suggestion for a good threshold?
+
+If we use a threshold of 0.02, the classifier will identify a set of potential at-risk situations that finds about half of all the true at-risk situations with a true positive rate 2.5 times higher than the overall population.
+
+Finally, we can evaluate our model using the confusion matrix. Setting our threshold to 0.02,
+
+```{r}
+ctab.test <- table(pred = test$pred > 0.02, atRisk = test$atRisk)
+ctab.test
+```
+
+```{r}
+precision <- ctab.test[2,2]/sum(ctab.test[2,])
+precision
+
+recall <- ctab.test[2,2]/sum(ctab.test[ ,2])
+recall
+
+enrich <- precision/mean(as.numeric(test$asRisk))
+enrich
+```
+The classifier has low precision but identifies a set of potential at-Risk cases that contains 55.5% of the true positive cases in the test set at a rate 2.66 times higher than the overall average.
+
+We will stop here for logistic regression. Note that you can perform the summary(model) and coefficients(model) on the loistic regression just as we did with the linear regression.
+
+
+# Churning
+
+
+```{r}
+d <- read.table('data/orange_small_train.data.gz', header = TRUE, sep = "\t",
+                na.strings = c("NA", ""))
+
+```
+
+```{r}
+churn <- read.table('data/orange_small_train_churn.labels.txt', header = TRUE, sep = "\t")
+
+```
+
+
+# References
